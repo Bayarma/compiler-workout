@@ -19,7 +19,7 @@ module Expr =
         !!                   --- disjunction
         &&                   --- conjunction
         ==, !=, <=, <, >=, > --- comparisons
-        +, -                 --- addition, subtraction
+        +, -                 --- additioån, subtraction
         *, /, %              --- multiplication, division, reminder
     *)
                                                             
@@ -34,15 +34,29 @@ module Expr =
     *)
     let update x v s = fun y -> if x = y then v else s y
 
-    (* Expression evaluator
+    let bool_of_int i = i != 0
 
-          val eval : state -> t -> int
- 
-       Takes a state and an expression, and returns the value of the expression in 
-       the given state.
-    *)
-    let eval _ = failwith "Not implemented yet"
+    let int_of_bool bool_check = if bool_check then 1 else 0
 
+    let get_op op left right = match op with
+  | "+" -> left + right
+  | "-" -> left - right
+  | "*" -> left * right
+  | "/" -> left / right
+  | "%" -> left mod right
+  | "!!" -> int_of_bool (bool_of_int left || bool_of_int right)
+  | "&&" -> int_of_bool (bool_of_int left && bool_of_int right)
+  | "==" -> int_of_bool (left == right)
+  | "!=" -> int_of_bool (left != right)
+  | "<=" -> int_of_bool (left <= right)
+  | "<" -> int_of_bool (left < right)
+  | ">=" -> int_of_bool (left >= right)
+  | ">" -> int_of_bool (left > right)
+
+let rec eval state expr = match expr with
+  | Const const -> const
+  | Var v -> state v 
+  | Binop (op, left, right) -> get_op op (eval state left) (eval state right)
   end
                     
 (* Simple statements: syntax and sematics *)
@@ -60,12 +74,15 @@ module Stmt =
     type config = Expr.state * int list * int list 
 
     (* Statement evaluator
-
           val eval : config -> t -> config
-
        Takes a configuration and a statement, and returns another configuration
     *)
-    let eval _ = failwith "Not implemented yet"
+    let rec eval config statement = match (config, statement) with
+      | ((state, value::inp, out), Read name) -> (Expr.update name value state, inp, out)
+      | ((state, inp, out), Write expr) -> (state, inp, out @ [(Expr.eval state expr)])
+      | ((state, inp, out), Assign (name, expr)) -> ((Expr.update name (Expr.eval state expr) state), inp, out)
+      | (config, Seq (s1, s2)) -> eval (eval config s1) s2
+      | _ -> failwith "Unknown operation"
                                                          
   end
 
@@ -75,10 +92,9 @@ module Stmt =
 type t = Stmt.t    
 
 (* Top-level evaluator
-
      eval : int list -> t -> int list
-
    Takes a program and its input stream, and returns the output stream
 *)
 let eval i p =
   let _, _, o = Stmt.eval (Expr.empty, i, []) p in o
+    
