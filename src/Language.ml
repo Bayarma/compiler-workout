@@ -44,7 +44,29 @@ module Expr =
        Takes a state and an expression, and returns the value of the expression in 
        the given state.
     *)
-    let eval _ = failwith "Not implemented yet"
+    let bool_of_int i = i != 0
+
+let int_of_bool bool_check = if bool_check then 1 else 0
+
+let get_op op left right = match op with
+  | "+" -> left + right
+  | "-" -> left - right
+  | "*" -> left * right
+  | "/" -> left / right
+  | "%" -> left mod right
+  | "!!" -> int_of_bool (bool_of_int left || bool_of_int right)
+  | "&&" -> int_of_bool (bool_of_int left && bool_of_int right)
+  | "==" -> int_of_bool (left == right)
+  | "!=" -> int_of_bool (left != right)
+  | "<=" -> int_of_bool (left <= right)
+  | "<" -> int_of_bool (left < right)
+  | ">=" -> int_of_bool (left >= right)
+  | ">" -> int_of_bool (left > right)
+
+let rec eval state expr = match expr with
+  | Const const -> const
+  | Var v -> state v 
+  | Binop (op, left, right) -> get_op op (eval state left) (eval state right)
 
     (* Expression parser. You can use the following terminals:
 
@@ -53,7 +75,21 @@ module Expr =
    
     *)
     ostap (
-      parse: empty {failwith "Not implemented yet"}
+      expr:
+		!(Ostap.Util.expr
+			(fun x -> x)
+			(Array.map (fun (a, ops) -> a, List.map do_Bin ops)
+				[|
+				`Lefta, ["!!"];
+                  		`Lefta, ["&&"];
+                  		`Nona , ["=="; "!="; "<="; ">="; "<"; ">"];
+                  		`Lefta, ["+"; "-"];
+                  		`Lefta, ["*"; "/"; "%"];
+				|]
+			)
+			primary
+			);
+	primary: x:IDENT {Var x} | c:DECIMAL {Const c} | -"(" expr -")"
     )
 
   end
@@ -78,11 +114,20 @@ module Stmt =
 
        Takes a configuration and a statement, and returns another configuration
     *)
-    let eval _ = failwith "Not implemented yet"
+    let rec eval (s, i, o) p = match p with
+    		| Read variable_name  -> (Expr.update variable_name  (hd i) s, tl i, o)
+    		| Write expression   -> (s, i, o @ [Expr.eval s expression])
+    		| Assign (variable_name, expression  ) -> (Expr.update variable_name (Expr.eval s expression ) s, i, o)
+    		| Seq (e1, e2)  -> eval (eval (s, i, o) e1) e2;;  
 
     (* Statement parser *)
     ostap (
-      parse: empty {failwith "Not implemented yet"}
+      stmt:
+			    x:IDENT ":=" e:!(Expr.expr) {Assign(x, e)}
+			    | "read" "(" x:IDENT ")" {Read x}
+			    | "write" "(" e:!(Expr.expr) ")" {Write e};
+			
+		  parse: s:stmt ";" rest:parse {Seq(s, rest)} | stmt
     )
       
   end
