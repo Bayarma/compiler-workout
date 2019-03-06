@@ -66,7 +66,7 @@ module Expr =
 let rec eval s expres = match expres with
 	    |Const c -> c 
 	    |Var v -> s v
-	    |Binop (op,l_e,r_e) -> get_oper op (eval s l_e) (eval s r_e)
+	    |Binop (op,l_e,r_e) -> get_op op (eval s l_e) (eval s r_e)
 
     (* Expression parser. You can use the following terminals:
 
