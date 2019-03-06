@@ -46,9 +46,9 @@ module Expr =
     *)
     let bool_of_int i = i != 0
 
-let int_of_bool bool_check = if bool_check then 1 else 0
+	let int_of_bool bool_check = if bool_check then 1 else 0
 
-let get_op op left right = match op with
+	let get_op op left right = match op with
   | "+" -> left + right
   | "-" -> left - right
   | "*" -> left * right
@@ -63,10 +63,10 @@ let get_op op left right = match op with
   | ">=" -> int_of_bool (left >= right)
   | ">" -> int_of_bool (left > right)
 
-let rec eval state expr = match expr with
-  | Const const -> const
-  | Var v -> state v 
-  | Binop (op, left, right) -> get_op op (eval state left) (eval state right)
+let rec eval s expres = match expres with
+	    |Const c -> c 
+	    |Var v -> s v
+	    |Binop (op,l_e,r_e) -> get_oper op (eval s l_e) (eval s r_e)
 
     (* Expression parser. You can use the following terminals:
 
