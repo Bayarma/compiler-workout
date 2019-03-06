@@ -26,7 +26,7 @@ type config = int list * Stmt.config
  *)                         
 let rec eval cfg prg =
   let step (st, (s, i, o)) p = match p with
-    | BINOP op -> (Language.Expr.get_oper op (hd (tl st)) (hd st) :: (tl (tl st)), (s, i, o))
+    | BINOP op -> (Language.Expr.get_op op (hd (tl st)) (hd st) :: (tl (tl st)), (s, i, o))
     | CONST n  -> (n :: st, (s, i, o))
     | READ     -> (hd i :: st, (s, tl i, o))
     | WRITE    -> (tl st, (s, i, o @ [hd st]))
