@@ -2,7 +2,7 @@
    The library provides "@type ..." syntax extension and plugins like show, etc.
 *)
 open GT
-
+open List
 (* Opening a library for combinator-based syntax analysis *)
 open Ostap.Combinators
        
@@ -74,6 +74,8 @@ let rec eval state expr = match expr with
          DECIMAL --- a decimal constant [0-9]+ as a string
    
     *)
+     let do_Bin oper =  ostap(- $(oper)), (fun x y -> Binop (oper, x, y))
+     
     ostap (
       expr:
 		!(Ostap.Util.expr
