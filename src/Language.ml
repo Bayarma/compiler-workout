@@ -1,3 +1,10 @@
+let counter = ref 0;;
+
+let next_var() = let result = "__repeat_variable__" ^ string_of_int !counter in
+                     counter := !counter + 1;
+                     result;;
+
+
 (* Opening a library for generic programming (https://github.com/dboulytchev/GT).
    The library provides "@type ..." syntax extension and plugins like show, etc.
 *)
@@ -5,6 +12,7 @@ open GT
 
 (* Opening a library for combinator-based syntax analysis *)
 open Ostap.Combinators
+open Ostap
        
 (* Simple expressions: syntax and semantics *)
 module Expr =
@@ -43,8 +51,31 @@ module Expr =
  
        Takes a state and an expression, and returns the value of the expression in 
        the given state.
-    *)                                                       
-    let eval st expr = failwith "Not yet implemented"
+    *)        
+
+    let bool_of_int i = i != 0
+
+	let int_of_bool bool_check = if bool_check then 1 else 0
+
+	let get_op op left right = match op with
+  | "+" -> left + right
+  | "-" -> left - right
+  | "*" -> left * right
+  | "/" -> left / right
+  | "%" -> left mod right
+  | "!!" -> int_of_bool (bool_of_int left || bool_of_int right)
+  | "&&" -> int_of_bool (bool_of_int left && bool_of_int right)
+  | "==" -> int_of_bool (left == right)
+  | "!=" -> int_of_bool (left != right)
+  | "<=" -> int_of_bool (left <= right)
+  | "<" -> int_of_bool (left < right)
+  | ">=" -> int_of_bool (left >= right)
+  | ">" -> int_of_bool (left > right)
+
+let rec eval s expres = match expres with
+	    |Const c -> c 
+	    |Var v -> s v
+	    |Binop (op,l_e,r_e) -> get_op op (eval s l_e) (eval s r_e)
 
     (* Expression parser. You can use the following terminals:
 
@@ -52,11 +83,28 @@ module Expr =
          DECIMAL --- a decimal constant [0-9]+ as a string
                                                                                                                   
     *)
-    ostap (                                      
-      parse: empty {failwith "Not yet implemented"}
+    let do_Bin oper =  ostap(- $(oper)), (fun x y -> Binop (oper, x, y))
+
+    ostap (
+      expr:
+		!(Ostap.Util.expr
+			(fun x -> x)
+			(Array.map (fun (a, ops) -> a, List.map do_Bin ops)
+				[|
+				`Lefta, ["!!"];
+                  		`Lefta, ["&&"];
+                  		`Nona , ["=="; "!="; "<="; ">="; "<"; ">"];
+                  		`Lefta, ["+"; "-"];
+                  		`Lefta, ["*"; "/"; "%"];
+				|]
+			)
+			primary
+			);
+	primary: x:IDENT {Var x} | c:DECIMAL {Const c} | -"(" expr -")"
     )
-    
+
   end
+    
                     
 (* Simple statements: syntax and sematics *)
 module Stmt =
@@ -82,13 +130,52 @@ module Stmt =
 
        Takes a configuration and a statement, and returns another configuration
     *)
-    let rec eval conf stmt = failwith "Not yet implemented"
+    let rec eval cnf stmt =
+      let (st, i, o) = cnf in
+      match stmt with
+      | Read x ->
+        begin
+          match i with
+          | z :: tail -> (Expr.update x z st, tail, o)
+          | _ -> failwith "cannot perform Read"
+        end
+      | Write e -> (st, i, o @ [Expr.eval st e])
+      | Assign (x, e) -> (Expr.update x (Expr.eval st e) st, i, o)
+      | Seq (s1, s2) -> eval (eval cnf s1) s2
+      | Skip -> cnf
+      | If (e, s1, s2) -> eval cnf (if Expr.eval st e != 0 then s1 else s2)
+      | While (e, s) ->
+        if Expr.eval st e != 0 then eval (eval cnf s) stmt else cnf
+      | RepeatUntil (e, s) ->
+        let ((st', _, _) as cnf') = eval cnf s in
+        if Expr.eval st' e = 0 then eval cnf' stmt else cnf'
                                
     (* Statement parser *)
     ostap (
-      parse: empty {failwith "Not yet implemented"}
+      parse  : seq | stmt;
+      stmt   : read | write | assign | skip | if' | while' | for' | repeat;
+      read   : %"read" -"(" x:IDENT -")" { Read x };
+      write  : %"write" -"(" e:!(Expr.parse) -")" { Write e };
+      assign : x:IDENT -":=" e:!(Expr.parse) { Assign (x, e) };
+      seq    : s1:stmt -";" s2:parse { Seq(s1, s2) };
+      skip   : %"skip" { Skip };
+      if'    : %"if" e:!(Expr.parse)
+               %"then" s1:parse
+                 elifs :(%"elif" !(Expr.parse) %"then" parse)*
+                 else' :(%"else" parse)? %"fi"
+                   {
+                     let else'' = match else' with
+                       | Some t -> t
+                       | None -> Skip
+                     in
+                     let else''' = List.fold_right (fun (e', t') t -> If (e', t', t)) elifs else'' in
+                     If (e, s1, else''')
+                   };
+      while' : %"while" e:!(Expr.parse) %"do" s:parse %"od" { While (e, s) };
+      for'   : %"for" s1:parse "," e:!(Expr.parse) "," s2:parse %"do" s3:parse %"od" { Seq (s1, While (e, Seq (s3, s2))) };
+      repeat : %"repeat" s:parse %"until" e:!(Expr.parse) { RepeatUntil (e, s) }
     )
-      
+
   end
 
 (* The top-level definitions *)
