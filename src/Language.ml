@@ -1,10 +1,3 @@
-let counter = ref 0;;
-
-let next_var() = let result = "__repeat_variable__" ^ string_of_int !counter in
-                     counter := !counter + 1;
-                     result;;
-
-
 (* Opening a library for generic programming (https://github.com/dboulytchev/GT).
    The library provides "@type ..." syntax extension and plugins like show, etc.
 *)
@@ -12,7 +5,6 @@ open GT
 
 (* Opening a library for combinator-based syntax analysis *)
 open Ostap.Combinators
-open Ostap
        
 (* Simple expressions: syntax and semantics *)
 module Expr =
@@ -83,28 +75,28 @@ let rec eval s expres = match expres with
          DECIMAL --- a decimal constant [0-9]+ as a string
                                                                                                                   
     *)
-    let do_Bin oper =  ostap(- $(oper)), (fun x y -> Binop (oper, x, y))
+    let create_binop op = fun x y -> Binop(op, x, y)
+    let parse_op_list ops = List.map (fun op -> ostap ($(op)), create_binop op) ops
 
     ostap (
+      parse: expr;
       expr:
-		!(Ostap.Util.expr
-			(fun x -> x)
-			(Array.map (fun (a, ops) -> a, List.map do_Bin ops)
-				[|
-				`Lefta, ["!!"];
-                  		`Lefta, ["&&"];
-                  		`Nona , ["=="; "!="; "<="; ">="; "<"; ">"];
-                  		`Lefta, ["+"; "-"];
-                  		`Lefta, ["*"; "/"; "%"];
-				|]
-			)
-			primary
-			);
-	primary: x:IDENT {Var x} | c:DECIMAL {Const c} | -"(" expr -")"
+        !(Ostap.Util.expr
+            (fun x -> x)
+            [|
+              `Lefta, parse_op_list ["!!"];
+              `Lefta, parse_op_list ["&&"];
+              `Nona , parse_op_list [">="; ">"; "<="; "<"; "!="; "=="];
+              `Lefta, parse_op_list ["+"; "-"];
+              `Lefta, parse_op_list ["*"; "/"; "%"];
+            |]
+            primary
+          );
+      primary: x:IDENT { Var x } | n:DECIMAL { Const n } | -"(" expr -")"
     )
 
   end
-    
+
                     
 (* Simple statements: syntax and sematics *)
 module Stmt =
