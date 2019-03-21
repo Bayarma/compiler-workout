@@ -97,29 +97,26 @@ let rec eval s expres = match expres with
 
   end
 
-                    
 (* Simple statements: syntax and sematics *)
 module Stmt =
   struct
 
     (* The type for statements *)
     @type t =
-    (* read into the variable           *) | Read   of string
-    (* write the value of an expression *) | Write  of Expr.t
-    (* assignment                       *) | Assign of string * Expr.t
-    (* composition                      *) | Seq    of t * t 
+    (* read into the variable           *) | Read        of string
+    (* write the value of an expression *) | Write       of Expr.t
+    (* assignment                       *) | Assign      of string * Expr.t
+    (* composition                      *) | Seq         of t * t
     (* empty statement                  *) | Skip
-    (* conditional                      *) | If     of Expr.t * t * t
-    (* loop with a pre-condition        *) | While  of Expr.t * t
-    (* loop with a post-condition       *) (* add yourself *)  with show
-                                                                    
+    (* conditional                      *) | If          of Expr.t * t * t
+    (* loop with a pre-condition        *) | While       of Expr.t * t
+    (* loop with a post-condition       *) | RepeatUntil of Expr.t * t with show
+
     (* The type of configuration: a state, an input stream, an output stream *)
-    type config = Expr.state * int list * int list 
+    type config = Expr.state * int list * int list
 
     (* Statement evaluator
-
          val eval : config -> t -> config
-
        Takes a configuration and a statement, and returns another configuration
     *)
     let rec eval cnf stmt =
@@ -141,7 +138,6 @@ module Stmt =
       | RepeatUntil (e, s) ->
         let ((st', _, _) as cnf') = eval cnf s in
         if Expr.eval st' e = 0 then eval cnf' stmt else cnf'
-                               
     (* Statement parser *)
     ostap (
       parse  : seq | stmt;
@@ -173,16 +169,14 @@ module Stmt =
 (* The top-level definitions *)
 
 (* The top-level syntax category is statement *)
-type t = Stmt.t    
+type t = Stmt.t
 
 (* Top-level evaluator
-
      eval : t -> int list -> int list
-
    Takes a program and its input stream, and returns the output stream
 *)
 let eval p i =
   let _, _, o = Stmt.eval (Expr.empty, i, []) p in o
 
 (* Top-level parser *)
-let parse = Stmt.parse                                                     
+let parse = Stmt.parse
