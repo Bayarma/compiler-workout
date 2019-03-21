@@ -45,9 +45,11 @@ module Expr =
        the given state.
     *)        
 
-    let eval_binop op l r =
-      let bool_to_int b = if b then 1 else 0 in
-      match op with
+    let bool_of_int i = i != 0
+
+	let int_of_bool bool_check = if bool_check then 1 else 0
+
+	let get_op op left right = match op with
   | "+" -> left + right
   | "-" -> left - right
   | "*" -> left * right
@@ -62,11 +64,11 @@ module Expr =
   | ">=" -> int_of_bool (left >= right)
   | ">" -> int_of_bool (left > right)
 
- let rec eval s e =
-      match e with
-      | Var v -> s v
-      | Const c -> c
-      | Binop (op, e1, e2) -> eval_binop op (eval s e1) (eval s e2)
+let rec eval s expres = match expres with
+	    |Const c -> c 
+	    |Var v -> s v
+	    |Binop (op,l_e,r_e) -> get_op op (eval s l_e) (eval s r_e)
+       
     (* Expression parser. You can use the following terminals:
 
          IDENT   --- a non-empty identifier a-zA-Z[a-zA-Z0-9_]* as a string
