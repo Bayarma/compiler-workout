@@ -1,7 +1,6 @@
-    
-open GT
+open GT       
 open Language
-
+       
 (* The type for the stack machine instructions *)
 @type insn =
 (* binary operator                 *) | BINOP   of string
@@ -26,12 +25,12 @@ open Language
 (* leaves a scope                  *) | LEAVE
 (* drop values from stack and jmp  *) | DROPJMP of string * int
 with show
-
+                                                   
 (* The type for the stack machine program *)
 type prg = insn list
 
 let print_prg p = List.iter (fun i -> Printf.printf "%s\n" (show(insn) i)) p
-let print_insn i = Printf.sprintf "%s\n" (show(insn) i)
+let print_insn i = Printf.sprintf "%s\n" (show(insn) i)                             
 
 let print_int_list l = List.iter (fun el -> Printf.printf "%d " el) l
 
@@ -44,29 +43,29 @@ type config = (prg * State.t) list * Value.t list * Expr.config
      val eval : env -> config -> prg -> config
    Takes an environment, a configuration and a program, and returns a configuration as a result. The
    environment is used to locate a label to jump to (via method env#labeled <label_name>)
-*)
+*)                                                  
 let split n l =
   let rec unzip (taken, rest) = function
   | 0 -> (List.rev taken, rest)
   | n -> let h::tl = rest in unzip (h::taken, tl) (n-1)
   in
   unzip ([], l) n
-
-let execute_instruction config instruction =
+          
+let execute_instruction config instruction = 
   let stack, (state, inp, out) = config in
   let stmt_config = (state, inp, out) in
   match instruction with
     | BINOP op ->
-        let y::x::rest = stack in
-        let value = Expr.to_func op (Value.to_int x) (Value.to_int y) in
-        (Value.of_int value)::rest, stmt_config
+        let y::x::rest = stack in 
+        let value = Expr.to_func op (Value.to_int x) (Value.to_int y) in 
+        (Value.of_int value)::rest, stmt_config 
     | CONST value -> (Value.of_int value)::stack, stmt_config
     | STRING value -> (Value.of_string (Bytes.of_string value))::stack, stmt_config
     | SEXP (tag, count) -> let values, rest = split count stack in ((Value.sexp tag @@ values)::rest, stmt_config)
     | LD name -> (State.eval state name)::stack, (state, inp, out)
     | ST name -> (List.tl stack), (State.update name (List.hd stack) state, inp, out)
-    | STA (name, size) ->
-      let (value::ids), rest = split (size + 1) stack in
+    | STA (name, size) -> 
+      let (value::ids), rest = split (size + 1) stack in 
       rest, (Stmt.update state name value ids, inp, out)
     | DROP -> (List.tl stack), stmt_config
     | DUP -> (List.hd stack)::stack, stmt_config
@@ -79,7 +78,7 @@ let execute_instruction config instruction =
       (Value.of_int res)::rest, stmt_config
     | _ -> failwith "Unknown instruction"
 
-let rec eval env config program =
+let rec eval env config program = 
   let (control_stack, stack, (state, i, o)) = config in
     match program with
     [] -> config
@@ -87,24 +86,24 @@ let rec eval env config program =
     | JMP l :: _ -> eval env config (env#labeled l)
     | CJMP (z, l) :: rest ->
         if (z = "z" && (Value.to_int (List.hd stack)) == 0 || z = "nz" && (Value.to_int (List.hd stack)) != 0)
-          then eval env (control_stack, List.tl stack, (state, i, o)) (env#labeled l)
+          then eval env (control_stack, List.tl stack, (state, i, o)) (env#labeled l) 
           else eval env (control_stack, List.tl stack, (state, i, o)) rest
     | DROPJMP (l, size) :: rest ->
       let z::stack = stack in
-      if Value.to_int z = 0
+      if Value.to_int z = 0 
         then let (_,  jmp_stack) = split size stack in eval env (control_stack, jmp_stack, (state, i, o)) (env#labeled l)
         else eval env (control_stack, stack, (state, i, o)) rest
-    | BEGIN (_, arg_names, local_names) :: rest ->
+    | BEGIN (_, arg_names, local_names) :: rest -> 
       let fun_state = State.enter state (arg_names @ local_names) in
-      let updated_state, updated_stack =
-        List.fold_left
+      let updated_state, updated_stack = 
+        List.fold_left 
           (fun (s, value::rest) name -> (State.update name value s, rest))
           (fun_state, stack)
           arg_names
       in
       eval env (control_stack, updated_stack, (updated_state, i, o)) rest
     | (RET _ | END) :: _ -> (match control_stack with
-      | (before_prg, before_state)::cs_rest ->
+      | (before_prg, before_state)::cs_rest -> 
         eval env (cs_rest, stack, (State.leave state before_state, i, o)) before_prg
       | _ -> config
     )
@@ -114,10 +113,10 @@ let rec eval env config program =
       let state = (State.push state scope args) in
       eval env (control_stack, stack, (state, i, o)) rest
     | LEAVE :: rest -> eval env (control_stack, stack, (State.drop state, i, o)) rest
-    | CALL (name, args_count, is_procedure) :: rest ->
-      if env#is_label name
+    | CALL (name, args_count, is_procedure) :: rest -> 
+      if env#is_label name 
         then eval env ((rest, state)::control_stack, stack, (state, i, o)) (env#labeled name)
-        else eval env (env#builtin (control_stack, stack, (state, i, o)) name args_count (is_procedure)) rest
+        else eval env (env#builtin (control_stack, stack, (state, i, o)) name args_count (is_procedure)) rest 
     | instruction::rest ->
       let updated_stack, updated_config = execute_instruction (stack, (state, i, o)) instruction in
       eval env (control_stack, updated_stack, updated_config) rest
@@ -127,6 +126,7 @@ let rec eval env config program =
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
 let run p i =
+  (*print_prg p;*)
   let module M = Map.Make (String) in
   let rec make_map m = function
   | []              -> m
@@ -144,6 +144,7 @@ let run p i =
            let args, stack' = split n stack in
            let (st, i, o, r) = Language.Builtin.eval (st, i, o, None) args f in
            let stack'' = if p then stack' else let Some r = r in r::stack' in
+           (*Printf.printf "Builtin:\n";*)
            (cstack, stack'', (st, i, o))
        end
       )
@@ -161,22 +162,22 @@ let label_generator =
   object (self)
     val mutable next = 0
 
-    method generate =
+    method generate = 
       next <- next + 1;
       ".label" ^ (string_of_int next)
   end
 
-let rec compile_call name args is_procedure =
+let rec compile_call name args is_procedure = 
   let compiled_args = List.flatten (List.rev (List.map compile_expr args)) in
   compiled_args @ [CALL (name, List.length args, is_procedure)]
 
 and compile_expr = function
   | Expr.Const n -> [CONST n]
-  | Expr.Array exprs ->
+  | Expr.Array exprs -> 
     let compiled_exprs = List.flatten (List.rev (List.map compile_expr exprs)) in
     compiled_exprs @ [CALL (".array", (List.length compiled_exprs), false)]
   | Expr.String s -> [STRING s]
-  | Expr.Sexp (name, exprs) ->
+  | Expr.Sexp (name, exprs) ->  
     let compiled_exprs = List.flatten (List.rev (List.map compile_expr exprs)) in
     compiled_exprs @ [SEXP (name, List.length exprs)]
   | Expr.Var x -> [LD x]
@@ -190,7 +191,7 @@ and make_bindings pattern =
   let rec inner p = match p with
     | Stmt.Pattern.Wildcard -> []
     | Stmt.Pattern.Ident var -> [[]]
-    | Stmt.Pattern.Sexp (_, exprs) ->
+    | Stmt.Pattern.Sexp (_, exprs) -> 
       let next i x = List.map (fun arr -> i::arr) (inner x) in List.flatten (List.mapi next exprs)
   in
   let elem i = [CONST i; CALL (".elem", 2, false)] in
@@ -202,32 +203,32 @@ and compile_simple_branch pattern stmt next_label end_label =
   let stmt_prg, s_used = compile_block (Stmt.Seq (stmt, Stmt.Leave)) end_label in
   pattern_prg @ make_bindings pattern @ [DROP; ENTER (List.rev (Stmt.Pattern.vars pattern))] @ stmt_prg, p_used, s_used
 
-and compile_pattern pattern end_label depth =
+and compile_pattern pattern end_label depth = 
   match pattern with
     | Stmt.Pattern.Wildcard -> [DROP], false
     | Stmt.Pattern.Ident _ -> [DROP], false
     | Stmt.Pattern.Sexp (name, exprs) ->
-      let compile_subpattern i pattern =
+      let compile_subpattern i pattern = 
         let inner_prg = match pattern with
-        | Stmt.Pattern.Sexp (_, ps) ->
-          if List.length ps > 0
+        | Stmt.Pattern.Sexp (_, ps) -> 
+          if List.length ps > 0 
             then [DUP] @ fst (compile_pattern pattern end_label (depth + 1)) @ [DROP]
             else fst (compile_pattern pattern end_label depth)
-        | _ -> fst (compile_pattern pattern end_label depth)
-        in
+        | _ -> fst (compile_pattern pattern end_label depth) 
+        in  
         [DUP; CONST i; CALL (".elem", 2, false)] @ inner_prg in
       let prg = List.flatten (List.mapi compile_subpattern exprs) in
-      [TAG name] @ [DROPJMP (end_label, depth)] @ prg, true
+      [TAG name] @ [DROPJMP (end_label, depth)] @ prg, true 
 
 and compile_block stmt end_label =
   match stmt with
     | Stmt.Assign (name, idxs, e) -> (
       match idxs with
         | [] -> compile_expr e @ [ST name], false
-        | idxs ->
+        | idxs -> 
           let compiled_idxs = List.fold_left (fun comp e -> comp @ (compile_expr e)) [] idxs in
-          (List.rev compiled_idxs) @ compile_expr e @ [STA (name, List.length idxs)], false)
-    | Stmt.Seq (s1, s2) ->
+          (List.rev compiled_idxs) @ compile_expr e @ [STA (name, List.length idxs)], false)  
+    | Stmt.Seq (s1, s2) -> 
       let l_end1 = label_generator#generate in
       let prg1, used1 = compile_block s1 l_end1 in
       let prg2, used2 = compile_block s2 end_label in
@@ -249,8 +250,8 @@ and compile_block stmt end_label =
       [LABEL l_repeat] @ repeat_prg @ compile_expr e @ [CJMP ("z", l_repeat)], false
     | Stmt.Case (e, brs) -> (match brs with
       | [pattern, stmt] ->
-        let br_prg, p_used, s_used = compile_simple_branch pattern stmt end_label end_label in
-        compile_expr e @ [DUP] @ br_prg, p_used || s_used
+        let br_prg, p_used, s_used = compile_simple_branch pattern stmt end_label end_label in 
+        compile_expr e @ [DUP] @ br_prg, p_used || s_used 
       | brs ->
         let n = List.length brs - 1 in
         let compile_branch_fold (prev_label, i, prg) (pattern, p_stmt) =
@@ -275,15 +276,15 @@ and compile_stmt stmt =
   prg @ (if used then [LABEL end_label] else []) 
 
 and compile_defs defs =
-  List.fold_left
-  (fun prev (name, (args, locals, body)) ->
-    let compiled_body = compile_stmt body in
+  List.fold_left 
+  (fun prev (name, (args, locals, body)) -> 
+    let compiled_body = compile_stmt body in 
     prev @ [LABEL name] @ [BEGIN (name, args, locals)] @ compiled_body @ [END]
   )
   []
   defs
 
-and compile (defs, stmt) =
+and compile (defs, stmt) = 
   let compiled_stmt = compile_stmt stmt in
   let compiled_defs = compile_defs defs in
   compiled_stmt @ [END] @ compiled_defs
